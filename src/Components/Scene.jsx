@@ -40,9 +40,9 @@ const Model = () => {
         console.log("newpoi", newpoi);
         newpoi.x += 1;
         setPoi(newpoi);
-
-        setClickedPoint(mouse);
-        console.log("inside if", mouse);
+        const intersection = intersects[0];
+        console.log("intersection", intersection.point);
+        setClickedPoint(intersection.point);
       }
     },
     [camera, scene]
