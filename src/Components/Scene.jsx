@@ -1,12 +1,12 @@
 import React, {
   useState,
   useEffect,
-  Suspense,
   useRef,
   useCallback,
+  Suspense,
 } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { useGLTF, Environment, Html, Line } from "@react-three/drei";
+import { useGLTF, Environment, Html, Line, Stage } from "@react-three/drei";
 import {
   Raycaster,
   Vector2,
@@ -18,7 +18,7 @@ import {
 import Loader from "./Loader";
 
 const Model = () => {
-  const { scene, camera } = useThree();
+  const { camera } = useThree();
   const [clickedPoint, setClickedPoint] = useState(null);
   const [poi, setPoi] = useState(null);
   const [selectedMeshName, setSelectedMeshName] = useState(null);
@@ -27,6 +27,7 @@ const Model = () => {
   const group = useRef();
   const raycaster = new Raycaster();
   const mouse = new Vector2();
+  const circleMeshRef = useRef(null);
 
   const onClick = useCallback(
     (event) => {
@@ -42,27 +43,32 @@ const Model = () => {
         setSelectedMeshName(intersects[0].object.name);
         const newpoi = new Vector3();
         intersects[0].object.getWorldPosition(newpoi);
-        newpoi.x += 1;
+        //check if more on left or right of screen
+        if (event.clientX / window.innerWidth > 0.5) {
+          newpoi.x += 0.5;
+        } else {
+          newpoi.x -= 0.5;
+        }
         setPoi(newpoi);
         setClickedPoint(intersects[0].point);
 
-        // Remove the previous circle mesh if it exists
-        if (circleMesh) {
-          group.current.remove(circleMesh);
+        if (!circleMeshRef.current) {
+          // Create a new circle mesh if it doesn't exist
+          const circleGeometry = new CircleGeometry(0.01, 32);
+          const circleMaterial = new MeshBasicMaterial({ color: 0xff0000 });
+          const newCircleMesh = new Mesh(circleGeometry, circleMaterial);
+          group.current.add(newCircleMesh);
+          setCircleMesh(newCircleMesh); // Update the state with the new circle mesh
+          circleMeshRef.current = newCircleMesh;
         }
 
-        // Create a new circle mesh
-        const circleGeometry = new CircleGeometry(0.05, 32);
-        const circleMaterial = new MeshBasicMaterial({ color: 0xff0000 });
-        const newCircleMesh = new Mesh(circleGeometry, circleMaterial);
-        newCircleMesh.position.copy(
-          intersects[0].point.add(new Vector3(0, 0, 0.1))
+        // Update the position of the circle mesh
+        circleMeshRef.current.position.copy(
+          intersects[0].point.add(new Vector3(0, 0, 0.02))
         );
-        group.current.add(newCircleMesh);
-        setCircleMesh(newCircleMesh);
       }
     },
-    [camera, scene, circleMesh]
+    [camera]
   );
 
   return (
@@ -72,7 +78,7 @@ const Model = () => {
           points={[clickedPoint, poi]}
           color="black"
           lineWidth={2}
-          position={[0, 0, 0.2]}
+          position={[0, 0, 0]}
         />
       )}
       {poi && (
@@ -82,15 +88,16 @@ const Model = () => {
           </div>
         </Html>
       )}
-      <group
-        ref={group}
-        position={[0, -2, 0]}
-        onClick={(e) => {
-          onClick(e);
-        }}
-      >
-        <primitive object={gltf.scene} scale={4} />
-      </group>
+      <Stage adjustCamera intensity={0.5} shadows="contact" environment="city">
+        <group
+          position={[0, -2, 0]}
+          onClick={(e) => {
+            onClick(e);
+          }}
+        >
+          <primitive object={gltf.scene} />
+        </group>
+      </Stage>
     </group>
   );
 };
@@ -102,6 +109,7 @@ export default function Scene() {
         <ambientLight intensity={3} color={"#3F2305"} />
         <Suspense fallback={<Loader />}>
           <Environment preset="studio" />
+
           <Model />
         </Suspense>
       </Canvas>
