@@ -1,15 +1,20 @@
-import React, { useState, useEffect, Suspense } from "react";
+import React, {
+  useState,
+  useEffect,
+  Suspense,
+  useRef,
+  useCallback,
+} from "react";
 import { Canvas, useThree } from "@react-three/fiber";
+import { useGLTF, Environment, Html, Line } from "@react-three/drei";
 import {
-  useGLTF,
-  Environment,
-  Sparkles,
-  OrbitControls,
-  Html,
-  Line,
-} from "@react-three/drei";
-import { useRef, useCallback } from "react";
-import { Raycaster, Vector2, Vector3 } from "three";
+  Raycaster,
+  Vector2,
+  Vector3,
+  CircleGeometry,
+  MeshBasicMaterial,
+  Mesh,
+} from "three";
 import Loader from "./Loader";
 
 const Model = () => {
@@ -17,15 +22,16 @@ const Model = () => {
   const [clickedPoint, setClickedPoint] = useState(null);
   const [poi, setPoi] = useState(null);
   const [selectedMeshName, setSelectedMeshName] = useState(null);
+  const [circleMesh, setCircleMesh] = useState(null); // State to hold the circle mesh
   const gltf = useGLTF("/future-robot-transformed.glb");
   const group = useRef();
   const raycaster = new Raycaster();
   const mouse = new Vector2();
+
   const onClick = useCallback(
     (event) => {
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-      console.log("outside if", mouse);
       raycaster.setFromCamera(mouse, camera);
 
       const intersects = raycaster.intersectObjects(
@@ -35,23 +41,39 @@ const Model = () => {
       if (intersects.length > 0) {
         setSelectedMeshName(intersects[0].object.name);
         const newpoi = new Vector3();
-        console.log("intersects", intersects[0].object);
         intersects[0].object.getWorldPosition(newpoi);
-        console.log("newpoi", newpoi);
         newpoi.x += 1;
         setPoi(newpoi);
-        const intersection = intersects[0];
-        console.log("intersection", intersection.point);
-        setClickedPoint(intersection.point);
+        setClickedPoint(intersects[0].point);
+
+        // Remove the previous circle mesh if it exists
+        if (circleMesh) {
+          group.current.remove(circleMesh);
+        }
+
+        // Create a new circle mesh
+        const circleGeometry = new CircleGeometry(0.05, 32);
+        const circleMaterial = new MeshBasicMaterial({ color: 0xff0000 });
+        const newCircleMesh = new Mesh(circleGeometry, circleMaterial);
+        newCircleMesh.position.copy(
+          intersects[0].point.add(new Vector3(0, 0, 0.1))
+        );
+        group.current.add(newCircleMesh);
+        setCircleMesh(newCircleMesh);
       }
     },
-    [camera, scene]
+    [camera, scene, circleMesh]
   );
 
   return (
-    <group position={[0, 0, 0]}>
+    <group position={[0, 0, 0]} ref={group}>
       {clickedPoint && poi && (
-        <Line points={[clickedPoint, poi]} color="black" lineWidth={2} />
+        <Line
+          points={[clickedPoint, poi]}
+          color="black"
+          lineWidth={2}
+          position={[0, 0, 0.2]}
+        />
       )}
       {poi && (
         <Html position={poi}>
@@ -78,7 +100,6 @@ export default function Scene() {
     <div className="relative h-screen w-screen">
       <Canvas shadows>
         <ambientLight intensity={3} color={"#3F2305"} />
-
         <Suspense fallback={<Loader />}>
           <Environment preset="studio" />
           <Model />
